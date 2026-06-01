@@ -1769,7 +1769,16 @@
             };
             
             const deleteSale = (sale) => {
-                // Dialog personnalisé au lieu de confirm()
+                // Si bénéfice NÉGATIF → forcer à l'enlever!
+                if (sale.profit < 0) {
+                    if (confirm(`⚠️ Bénéfice NÉGATIF: ${sale.profit}F\n\nCette vente sera supprimée AVEC le bénéfice négatif!`)) {
+                        setSales(prev => prev.map(x => x.id === sale.id ? { ...x, status: 'deleted', deletedAt: new Date().toISOString() } : x));
+                        alert(`✅ Vente supprimée\n✅ Bénéfice négatif enlevé: ${sale.profit}F`);
+                    }
+                    return;
+                }
+                
+                // Si bénéfice POSITIF → proposer les deux options
                 const dialog = document.createElement('div');
                 dialog.style.cssText = `
                     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -1779,7 +1788,7 @@
                 `;
                 dialog.innerHTML = `
                     <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 900; color: #0f172a;">Supprimer cette vente?</h3>
-                    <p style="margin: 0 0 20px; font-size: 14px; color: #64748b;">Vente #${sale.num} - ${sale.total}F</p>
+                    <p style="margin: 0 0 20px; font-size: 14px; color: #64748b;">Vente #${sale.num} - ${sale.total}F - Bénéfice: ${sale.profit}F</p>
                     <div style="display: flex; gap: 10px; margin-top: 20px;">
                         <button id="keepBenefit" style="flex: 1; padding: 12px; background: #10b981; color: white; border: none; border-radius: 12px; font-weight: 900; cursor: pointer; font-size: 12px;">✅ GARDER BÉNÉFICE</button>
                         <button id="removeBenefit" style="flex: 1; padding: 12px; background: #ef4444; color: white; border: none; border-radius: 12px; font-weight: 900; cursor: pointer; font-size: 12px;">❌ ENLEVER BÉNÉFICE</button>
@@ -1789,7 +1798,7 @@
                 
                 document.getElementById('keepBenefit').onclick = () => {
                     document.body.removeChild(dialog);
-                    // Garder le bénéfice
+                    // Garder le bénéfice POSITIF
                     try {
                         const archiveKey = 'ma_market_archived_benefits_v3';
                         const existing = JSON.parse(localStorage.getItem(archiveKey) || '[]');
@@ -2365,6 +2374,32 @@
                                             if (d.au) storage.set(KEYS.AUDIT, d.au);
                                             window.location.reload();
                                         } catch (err) { alert("Fichier invalide"); }
+                                    };
+                                    r.readAsText(f);
+                                }}/>
+                            </label>
+                            <label className="py-4 bg-orange-100 text-orange-700 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 cursor-pointer"><Icon name="plus-circle" size={16}/> Importer produits (JSON)
+                                <input type="file" accept=".json" className="hidden" onChange={e => {
+                                    const f = e.target.files[0]; if (!f) return;
+                                    const r = new FileReader();
+                                    r.onload = (ev) => {
+                                        try {
+                                            const d = JSON.parse(ev.target.result);
+                                            // Accepte soit {p: [produits]} soit directement [produits]
+                                            const newProds = d.p || d;
+                                            if (!Array.isArray(newProds)) { alert("Format invalide"); return; }
+                                            
+                                            const count = newProds.length;
+                                            if (!confirm(`Ajouter ${count} produits?\n\nLes produits existants seront gardés.`)) return;
+                                            
+                                            // Ajouter les produits SANS remplacer
+                                            setProducts(prev => [...prev, ...newProds]);
+                                            logAudit('IMPORT', `${count} produits importés`);
+                                            alert(`✅ ${count} produits importés avec succès!`);
+                                        } catch (err) { 
+                                            console.error(err);
+                                            alert("Erreur: Fichier JSON invalide"); 
+                                        }
                                     };
                                     r.readAsText(f);
                                 }}/>
